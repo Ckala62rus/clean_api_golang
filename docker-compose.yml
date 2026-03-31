@@ -4,6 +4,10 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.live
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
     ports:
       - 3000:3000
       - 40000:40000
