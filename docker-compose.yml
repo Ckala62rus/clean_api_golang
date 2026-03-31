@@ -1,0 +1,23 @@
+services:
+  app-dev-live:
+    container_name: app-dev-live
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.live
+    ports:
+      - 3000:3000
+      - 40000:40000
+    volumes:
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    networks:
+      - appnet
+
+volumes:
+  go_mod_cache:
+  go_build_cache:
+
+networks:
+  appnet:
+    driver: bridge
