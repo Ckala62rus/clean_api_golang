@@ -1,10 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"github.com/Ckala62rus/clean_api_golang.git/pkg"
+)
 
 func main() {
-	fmt.Println("work!")
-	fmt.Println("test")
 	logger := pkg.MainLogger
 	logger.Info("Logger initialized", "aaa", "bbb", "ccc")
+
+	cfg := pkg.MainConfig
+	environment := cfg.Env
+	logger.Debug("Environment", environment)
+	logger.Debug("Environment", environment)
 }

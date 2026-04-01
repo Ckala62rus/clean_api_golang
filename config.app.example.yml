@@ -1,0 +1,15 @@
+# Config for app running inside Docker Compose (service names as hosts)
+#env: "production"
+env: "qwerty"
+config_file: "config.app.yml"
+http_server:
+    address: "0.0.0.0"
+    port: "3000"
+    timeout: 4s
+    idle_timeout: 60s
+database:
+    postgres_host: "postgres"
+    postgres_port: "5432"
+    postgres_user: "postgres"
+    postgres_password: "postgres"
+    postgres_db: "db"
