@@ -1,4 +1,7 @@
 services:
+  # ============================================
+  # Приложение со встроенным hot reload
+  # ============================================
   app-dev-live:
     container_name: app-dev-live
     build:
@@ -20,9 +23,64 @@ services:
     environment:
       CONFIG_PATH: "/app/config.app.yml"
 
+  # ============================================
+  # Grafana Alloy - агент сбора логов (замена драйвера)
+  # ============================================
+  alloy:
+    image: grafana/alloy:v1.15.0
+    container_name: alloy
+    volumes:
+      # Монтируем Docker socket для доступа к контейнерам
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Монтируем директорию с логами Docker (на случай, если Alloy не может читать через socket)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Наш конфиг
+      - ./docker/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Хранилище для метаданных Alloy
+      - alloy-data:/var/lib/alloy
+    command: [ "run", "--storage.path=/var/lib/alloy", "/etc/alloy/config.alloy" ]
+    restart: unless-stopped
+    depends_on:
+      - loki
+    networks:
+      - appnet
+    # network_mode: host  # Раскомментировать если Loki на хосте, не в compose
+    # environment:
+    #   - LOKI_URL=http://loki:3100/loki/api/v1/push  # для config.alloy
+
+  # ============================================
+  # Loki - хранилище логов
+  # ============================================
+  loki:
+    image: grafana/loki:3.4.1
+    container_name: app-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - appnet
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: app-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PLUGINS_PREINSTALL: grafana-pyroscope-datasource
+    volumes:
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - loki
+    networks:
+      - appnet
+
 volumes:
   go_mod_cache:
   go_build_cache:
+  alloy-data:
 
 networks:
   appnet:

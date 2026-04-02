@@ -1,0 +1,87 @@
+// ============================================
+// ШАГ 1: Обнаружение Docker-контейнеров
+// ============================================
+discovery.docker "containers" {
+    host             = "unix:///var/run/docker.sock"
+    refresh_interval = "10s"
+}
+
+// ============================================
+// ШАГ 2: Релейблинг (обогащение лейблами)
+// Преобразуем внутренние метаданные Docker в понятные лейблы для Loki
+// ============================================
+discovery.relabel "docker_containers" {
+    targets = discovery.docker.containers.targets
+
+    // Извлекаем имя контейнера (обрезаем первый слеш)
+    rule {
+        source_labels = ["__meta_docker_container_name"]
+        regex         = "/(.*)"
+        target_label  = "container"
+        action        = "replace"
+    }
+
+    // Добавляем лейбл с именем образа
+    rule {
+        source_labels = ["__meta_docker_container_image"]
+        target_label  = "image"
+        action        = "replace"
+    }
+
+    // Добавляем лейбл с ID контейнера
+    rule {
+        source_labels = ["__meta_docker_container_id"]
+        target_label  = "container_id"
+        action        = "replace"
+    }
+
+    // Извлекаем все пользовательские лейблы Docker (например, app.name, app.version)
+    rule {
+        source_labels = ["__meta_docker_container_label_app_name"]
+        target_label  = "app_name"
+        action        = "replace"
+    }
+    rule {
+        source_labels = ["__meta_docker_container_label_app_version"]
+        target_label  = "app_version"
+        action        = "replace"
+    }
+
+    // Добавляем статический лейбл для идентификации источника
+    rule {
+        target_label = "job"
+        replacement  = "docker"
+        action       = "replace"
+    }
+}
+
+// ============================================
+// ШАГ 3: Сбор логов из Docker-контейнеров
+// ============================================
+loki.source.docker "containers" {
+    host             = "unix:///var/run/docker.sock"
+    targets          = discovery.relabel.docker_containers.output
+    forward_to       = [loki.write.local.receiver]
+    relabel_rules    = discovery.relabel.docker_containers.rules
+    refresh_interval = "10s"
+}
+
+// ============================================
+// ШАГ 4: Отправка в Loki
+// ============================================
+loki.write "local" {
+    endpoint {
+        url = "http://loki:3100/loki/api/v1/push"
+        // Для Grafana Cloud используйте URL и Basic Auth:
+        // url = "https://<user-id>:<api-key>@logs-prod-0.grafana.net/loki/api/v1/push"
+        // basic_auth {
+        //     username = "<your-username>"
+        //     password = "<your-api-key>"
+        // }
+    }
+    // Внешние лейблы, которые будут добавлены ко всем логам
+    external_labels = {
+        env      = "production",
+        hostname = "docker-host",
+    }
+}
